@@ -1,0 +1,204 @@
+# Starter pipeline
+# Start with a minimal pipeline that you can customize to build and deploy your code.
+# Add steps that build, run tests, deploy, and more:
+# https://aka.ms/yaml
+
+trigger:
+- 'main'
+
+pool:
+  vmImage: ubuntu-latest
+
+stages:
+- stage: Build_Stage_For_Infra
+  displayName: Infra Build
+
+  jobs:
+    - job: Create_Infra_Build_Artifact
+      workspace:
+        clean: all
+
+      steps:
+      - task: TerraformInstaller@1
+        inputs:
+          terraformVersion: 'latest'
+
+      - task: TerraformTaskV4@4
+        displayName: 'Terraform Init'
+        inputs:
+          provider: 'azurerm'
+          command: 'init'
+          workingDirectory: '$(System.DefaultWorkingDirectory)/'
+          backendServiceArm: 'DevOps-zeta-sc'
+          backendAzureRmResourceGroupName: 'march-dev-rg01'
+          backendAzureRmStorageAccountName: 'tfstate01acc'
+          backendAzureRmContainerName: 'tfstatestoring'
+          backendAzureRmKey: 'terraform.tfstate'
+
+      - task: TerraformTaskV4@4
+        displayName: 'Terraform Validate'
+        inputs:
+          command: validate
+          workingDirectory: '$(System.DefaultWorkingDirectory)/'
+
+      - task: TerraformTaskV4@4
+        displayName: 'Terraform Plan'
+        inputs:
+          provider: 'azurerm'
+          command: 'plan'
+          workingDirectory: '$(System.DefaultWorkingDirectory)/'
+          commandOptions: '-out=tfplan'
+          environmentServiceNameAzureRM: 'DevOps-zeta-sc'
+
+      - task: PublishBuildArtifacts@1
+        inputs:
+          PathtoPublish: '$(Build.ArtifactStagingDirectory)/'
+          ArtifactName: 'drop'
+          publishLocation: 'Container'
+
+
+- stage: Deploy_infra_dev_environment
+  displayName: Dev Infra Deploy
+
+  pool:
+    vmImage: 'ubuntu-latest'
+    depends-on: Build_Stage_For_Infra
+    condition: succeeded()
+
+  jobs:
+    - job: Deploy_dev_environment
+      workspace:
+        clean: all
+
+      steps:
+      - task: DownloadBuildArtifacts@1
+        inputs:
+          buildType: 'current'
+          downloadType: 'single'
+          artifactName: 'drop'
+          downloadPath: '$(System.ArtifactsDirectory)/'
+
+      - task: TerraformTaskV4@4
+        displayName: 'Terraform Init'
+        inputs:
+          provider: 'azurerm'
+          command: 'init'
+          workingDirectory: '$(System.DefaultWorkingDirectory)/'
+          backendServiceArm: 'DevOps-zeta-sc'
+          backendAzureRmResourceGroupName: 'march-dev-rg01'
+          backendAzureRmStorageAccountName: 'tfstate01acc'
+          backendAzureRmContainerName: 'tfstatestoring'
+          backendAzureRmKey: 'terraform.tfstate'
+
+      - task: TerraformTaskV4@4
+        displayName: 'Terraform Validate'
+        inputs:
+          command: validate
+          workingDirectory: '$(System.DefaultWorkingDirectory)/'
+
+      - task: TerraformTaskV4@4
+        displayName: 'Terraform Apply'
+        inputs:
+          provider: 'azurerm'
+          command: 'apply'
+          workingDirectory: '$(System.DefaultWorkingDirectory)/'
+          commandOptions: '-auto-approve'
+          environmentServiceNameAzureRM: 'DevOps-zeta-sc'
+
+- stage: Deploy_infra_UAT_environment
+  displayName: UAT Infra Deploy
+
+  pool:
+    vmImage: 'ubuntu-latest'
+    depends-on: Deploy_infra_dev_environment
+    condition: succeeded()
+
+  jobs:
+    - job: Deploy_dev_environment
+      workspace:
+        clean: all
+
+      steps:
+
+      - task: DownloadBuildArtifacts@1
+        inputs:
+          buildType: 'current'
+          downloadType: 'single'
+          artifactName: 'drop'
+          downloadPath: '$(System.ArtifactsDirectory)/'
+
+      - task: TerraformTaskV4@4
+        displayName: 'Terraform Init'
+        inputs:
+          provider: 'azurerm'
+          command: 'init'
+          workingDirectory: '$(System.DefaultWorkingDirectory)/'
+          backendServiceArm: 'DevOps-zeta-sc'
+          backendAzureRmResourceGroupName: 'march-dev-rg01'
+          backendAzureRmStorageAccountName: 'tfstate01acc'
+          backendAzureRmContainerName: 'tfstatestoring'
+          backendAzureRmKey: 'terraform.tfstate'
+
+      - task: TerraformTaskV4@4
+        displayName: 'Terraform Validate'
+        inputs:
+          command: validate
+          workingDirectory: '$(System.DefaultWorkingDirectory)/'
+
+      - task: TerraformTaskV4@4
+        displayName: 'Terraform Apply'
+        inputs:
+          provider: 'azurerm'
+          command: 'apply'
+          workingDirectory: '$(System.DefaultWorkingDirectory)/'
+          commandOptions: '-auto-approve'
+          environmentServiceNameAzureRM: 'DevOps-zeta-sc'
+
+
+- stage: Deploy_infra_PROD_environment
+  displayName: Prod Infra Deploy
+
+  pool:
+    vmImage: 'ubuntu-latest'
+    depends-on: Deploy_infra_UAT_environment
+    condition: succeeded()
+
+  jobs:
+    - job: Deploy_dev_environment
+      workspace:
+        clean: all
+
+      steps:
+      - task: DownloadBuildArtifacts@1
+        inputs:
+          buildType: 'current'
+          downloadType: 'single'
+          artifactName: 'drop'
+          downloadPath: '$(System.ArtifactsDirectory)/'
+
+      - task: TerraformTaskV4@4
+        displayName: 'Terraform Init'
+        inputs:
+          provider: 'azurerm'
+          command: 'init'
+          workingDirectory: '$(System.DefaultWorkingDirectory)/'
+          backendServiceArm: 'DevOps-zeta-sc'
+          backendAzureRmResourceGroupName: 'march-dev-rg01'
+          backendAzureRmStorageAccountName: 'tfstate01acc'
+          backendAzureRmContainerName: 'tfstatestoring'
+          backendAzureRmKey: 'terraform.tfstate'
+
+      - task: TerraformTaskV4@4
+        displayName: 'Terraform Validate'
+        inputs:
+          command: validate
+          workingDirectory: '$(System.DefaultWorkingDirectory)/'
+
+      - task: TerraformTaskV4@4
+        displayName: 'Terraform Apply'
+        inputs:
+          provider: 'azurerm'
+          command: 'apply'
+          workingDirectory: '$(System.DefaultWorkingDirectory)/'
+          commandOptions: '-auto-approve'
+          environmentServiceNameAzureRM: 'DevOps-zeta-sc'
